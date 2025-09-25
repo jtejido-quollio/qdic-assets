@@ -1,0 +1,16 @@
+fastapi
+alembic
+uvicorn[standard]
+pydantic
+pydantic-settings
+SQLAlchemy[asyncio]
+asyncpg
+psycopg2-binary
+httpx
+python-jose[cryptography]
+structlog
+orjson
+tenacity
+aio-pika
+dependency-injector
+loguru

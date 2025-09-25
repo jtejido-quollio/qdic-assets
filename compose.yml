@@ -1,0 +1,128 @@
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    command: /opt/venv/bin/alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/assets
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: assets
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c max_logical_replication_workers=4
+      -c max_worker_processes=8
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+      - "5552:5552"    # Streams protocol
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: supersecret
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: >
+        -rabbitmq_management load_definitions "/etc/rabbitmq/definitions.json"
+    command: >
+      bash -lc "
+        rabbitmq-plugins enable --offline rabbitmq_stream rabbitmq_stream_management &&
+        rabbitmq-server
+      "
+    healthcheck:
+      test: rabbitmq-diagnostics --quiet check_running && rabbitmq-diagnostics --quiet check_local_alarms
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./data/rabbitmq/lib:/var/lib/rabbitmq/
+      - ./data/rabbitmq/log:/var/log/rabbitmq
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+
+  debezium:
+    image: quay.io/debezium/server:3.1
+    container_name: debezium-server
+    healthcheck:
+      test: curl http://debezium:8080/q/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+        restart: true
+    environment:
+      REPLICATOR_USER: replicator
+      REPLICATOR_PASSWORD: replicator_password
+      EVENTS_QUEUE: app.public.events
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: supersecret
+      QUARKUS_CONFIG_LOCATIONS: /debezium/conf/application.properties
+    volumes:
+      - ./debezium/conf:/debezium/conf:ro
+      - ./debezium/data:/debezium/data
+    ports:
+      - "8088:8080"
+
+  adminer:
+    image: adminer:4.8.1
+    restart: always
+    ports:
+      - 7775:8080
+    environment:
+      ADMINER_DEFAULT_DB_DRIVER: pgsql
+      ADMINER_DEFAULT_DB_HOST: db
+      ADMINER_DEFAULT_DB_NAME: assets
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+        restart: true
+      debezium:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]

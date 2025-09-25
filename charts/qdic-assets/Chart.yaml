@@ -1,0 +1,4 @@
+apiVersion: v2
+name: qdic-assets
+version: 0.0.1
+type: application

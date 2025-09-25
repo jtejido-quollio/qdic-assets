@@ -1,0 +1,33 @@
+{
+  "vhosts": [{ "name": "/" }],
+  "users": [
+    { "name": "rabbit", "password_hash": "ogEfL1UGI36zZTsMmgal2ZNekkWiPfUQTI2Ci0bMnUsXInqz", "hashing_algorithm": "rabbit_password_hashing_sha256", "tags": "administrator" }
+  ],
+  "permissions": [
+    { "user": "rabbit", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*" }
+  ],
+  "exchanges": [
+    { "name": "debezium", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "app.public.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "stream"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "debezium",
+      "vhost": "/",
+      "destination": "app.public.events",
+      "destination_type": "queue",
+      "routing_key": "app.public.events",
+      "arguments": {}
+    }
+  ]
+}

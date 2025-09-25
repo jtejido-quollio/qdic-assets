@@ -1,0 +1,56 @@
+{{- if .Values.debezium.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: qdic-assets-debezium }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: qdic-assets-debezium } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: qdic-assets-debezium } }
+    spec:
+      containers:
+        - name: debezium-server
+          image: {{ .Values.debezium.image | quote }}
+          env: [ { name: QUARKUS_PROFILE, value: "prod" } ]
+          volumeMounts: [ { name: app-config, mountPath: /debezium/conf } ]
+      volumes: [ { name: app-config, configMap: { name: qdic-assets-debezium-config } } ]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: qdic-assets-debezium-config }
+data:
+  application.properties: |
+    debezium.sink.type=rabbitmq
+    debezium.sink.rabbitmq.connection.host={{ .Values.debezium.rabbitmq.host }}
+    debezium.sink.rabbitmq.connection.port={{ .Values.debezium.rabbitmq.port }}
+    debezium.sink.rabbitmq.connection.username={{ .Values.debezium.rabbitmq.username }}
+    debezium.sink.rabbitmq.connection.password={{ .Values.debezium.rabbitmq.password }}
+    debezium.sink.rabbitmq.connection.virtual.host={{ .Values.debezium.rabbitmq.vhost }}
+    debezium.sink.rabbitmq.exchange=debezium
+    debezium.sink.rabbitmq.exchange.declare=true
+    debezium.sink.rabbitmq.exchange.type=topic
+    debezium.sink.rabbitmq.exchange.durable=true
+    debezium.sink.rabbitmq.routingKey={{ .Values.debezium.rabbitmq.routingKey }}
+
+    debezium.format.value=json
+    debezium.format.key=json
+    debezium.format.schemas.enable=false
+
+    debezium.source.connector.class=io.debezium.connector.postgresql.PostgresConnector
+    debezium.source.database.hostname={{ .Values.debezium.postgres.host }}
+    debezium.source.database.port={{ .Values.debezium.postgres.port }}
+    debezium.source.database.user={{ .Values.debezium.postgres.user }}
+    debezium.source.database.password={{ .Values.debezium.postgres.password }}
+    debezium.source.database.dbname={{ .Values.debezium.postgres.db }}
+    debezium.source.plugin.name=pgoutput
+    debezium.source.publication.autocreate.mode=filtered
+    debezium.source.slot.name={{ .Values.debezium.postgres.slot }}
+    debezium.source.publication.name={{ .Values.debezium.postgres.publication }}
+    debezium.source.topic.prefix=app
+    debezium.source.table.include.list={{ .Values.debezium.postgres.table_include_list }}
+    debezium.source.snapshot.mode=initial
+    debezium.source.offset.storage.file.filename=/debezium/data/offsets.dat
+    debezium.source.offset.flush.interval.ms=1000
+
+    quarkus.log.level=INFO
+{{- end }}

@@ -1,0 +1,66 @@
+name: Release Chart (OCI / GHCR)
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+  CHART_DIR: charts/qdic-assets         # <- set to your chart dir in this repo
+  CHART_EXPECTED_NAME: qdic-assets-chart
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with: { version: v3.14.4 }
+
+      - name: Derive version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          VER="${TAG#v}"
+          echo "version=${VER}" >> $GITHUB_OUTPUT
+
+      - name: Validate chart name & version
+        working-directory: ${{ env.CHART_DIR }}
+        run: |
+          NAME=$(yq '.name' Chart.yaml)
+          VER=$(yq '.version' Chart.yaml)
+          echo "Chart: $NAME, Version: $VER"
+          test "$NAME" = "${{ env.CHART_EXPECTED_NAME }}"
+          test "$VER" = "${{ steps.ver.outputs.version }}"
+
+      - name: Helm lint
+        working-directory: ${{ env.CHART_DIR }}
+        run: helm lint .
+
+      - name: Login to GHCR (OCI)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Package chart
+        id: pkg
+        working-directory: ${{ env.CHART_DIR }}
+        run: |
+          PKG=$(helm package . | awk '{print $NF}')
+          echo "pkg=${PKG}" >> $GITHUB_OUTPUT
+
+      - name: Push chart to GHCR
+        run: helm push "${{ steps.pkg.outputs.pkg }}" oci://${{ env.REGISTRY }}/${{ env.OWNER }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CHART_EXPECTED_NAME }}
+          path: ${{ env.CHART_DIR }}/${{ steps.pkg.outputs.pkg }}
