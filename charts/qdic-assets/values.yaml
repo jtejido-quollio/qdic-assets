@@ -1,12 +1,25 @@
 image: { repository: ghcr.io/your-org/qdic-assets, tag: latest, pullPolicy: Always }
 env:
+  ENV: "dev"
+  APP_NAME: "qdic-assets"
+  SITE_NAME: "site-a"
   CONTROLLER_URL: "http://qdic-controller:8080"
+  TENANT_ID: "acme"
   DATABASE_URL: "postgresql+asyncpg://assets:password@postgres.tenant:5432/assets"
   RABBITMQ_URL: "amqp://user:pass@rabbitmq.tenant:5672/"
-  OPENSEARCH_URL: "http://opensearch.tenant:9200"
   ADVERTISE_ENDPOINT: ""
+  READINESS_PATH: "/healthz"
+  EVENT_PROCESSOR_WORKER_POOL_SIZE: 1000
+  EVENT_CONSUMER_WORKER_POOL_SIZE: 1
+  REPLICATOR_PASSWORD: "replicator_password"
+  REPLICATOR_USER: "replicator"
+  PUBLICATION_NAME: "events_publication"
+  RABBITMQ_EVENTS_QUEUE: "app.public.events"
+
 service: { type: ClusterIP, port: 8080 }
 resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { cpu: 1, memory: 1Gi } }
+imagePullSecrets: []
+
 debezium:
   enabled: true
   image: quay.io/debezium/server:3.1
@@ -14,8 +27,8 @@ debezium:
     host: "postgres.tenant"
     port: 5432
     db: "poc"
-    user: "debezium"
-    password: "debeziumpass"
+    user: "replicator"
+    password: "replicator"
     slot: "app_cdc_slot"
     publication: "events_publication"
     table_include_list: "public.events"
@@ -27,3 +40,15 @@ debezium:
     exchange: "debezium"
     routingKey: "app.public.events"
     vhost: "/tenant"
+
+migrations:
+  enabled: true
+  hookPhases: "pre-install,pre-upgrade"
+  image:
+    repository: ghcr.io/jtejido-quollio/qdic-assets
+    tag: latest
+    pullPolicy: Always
+  command: ["sh", "-lc", "alembic upgrade head"]
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  extraEnv: []

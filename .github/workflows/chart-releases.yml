@@ -12,7 +12,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
-  CHART_DIR: charts/qdic-assets         # <- set to your chart dir in this repo
+  CHART_DIR: charts/qdic-assets
   CHART_EXPECTED_NAME: qdic-assets-chart
 
 jobs:

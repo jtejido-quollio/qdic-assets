@@ -1,0 +1,45 @@
+# migration-job.yaml (template)
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "qdic-assets.fullname" . }}-migrate
+  annotations:
+    "helm.sh/hook": {{ .Values.migrations.hookPhases | default "pre-install,pre-upgrade" | quote }}
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit | default 3 }}
+  template:
+    metadata:
+      labels:
+        {{- include "qdic-assets.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.migrations.image.repository | default .Values.image.repository }}:{{ .Values.migrations.image.tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.migrations.image.pullPolicy | default .Values.image.pullPolicy }}
+          workingDir: /app
+          command: ["python", "-m", "alembic", "upgrade", "head"]
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.env.DATABASE_URL | quote }}
+            - name: REPLICATOR_USER
+              value: {{ .Values.env.REPLICATOR_USER | quote }}
+            - name: REPLICATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qdic-assets-secrets
+                  key: REPLICATOR_PASSWORD
+            - name: PUBLICATION_NAME
+              value: {{ .Values.env.PUBLICATION_NAME | quote }}
+            - name: EVENTS_SCHEMA
+              value: {{ .Values.env.EVENTS_SCHEMA | default "public" | quote }}
+            - name: EVENTS_TABLE
+              value: {{ .Values.env.EVENTS_TABLE  | default "events"  | quote }}
+{{- end }}

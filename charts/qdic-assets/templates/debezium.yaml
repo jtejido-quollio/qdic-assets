@@ -8,12 +8,18 @@ spec:
   template:
     metadata: { labels: { app.kubernetes.io/name: qdic-assets-debezium } }
     spec:
+      volumes:
+        - name: app-config
+          configMap: { name: qdic-assets-debezium-config }
+        - name: debezium-data
+          emptyDir: {}
       containers:
         - name: debezium-server
           image: {{ .Values.debezium.image | quote }}
           env: [ { name: QUARKUS_PROFILE, value: "prod" } ]
-          volumeMounts: [ { name: app-config, mountPath: /debezium/conf } ]
-      volumes: [ { name: app-config, configMap: { name: qdic-assets-debezium-config } } ]
+          volumeMounts:
+            - { name: app-config, mountPath: /debezium/conf }
+            - { name: debezium-data, mountPath: /debezium/data }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -43,7 +49,7 @@ data:
     debezium.source.database.password={{ .Values.debezium.postgres.password }}
     debezium.source.database.dbname={{ .Values.debezium.postgres.db }}
     debezium.source.plugin.name=pgoutput
-    debezium.source.publication.autocreate.mode=filtered
+    debezium.source.publication.autocreate.mode=disabled
     debezium.source.slot.name={{ .Values.debezium.postgres.slot }}
     debezium.source.publication.name={{ .Values.debezium.postgres.publication }}
     debezium.source.topic.prefix=app

@@ -7,30 +7,69 @@ spec:
   template:
     metadata: { labels: { app.kubernetes.io/name: qdic-assets } }
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: assets
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
+            - name: ENV
+              value: {{ .Values.env.ENV | quote }}
+            - name: APP_NAME
+              value: {{ .Values.env.APP_NAME | quote }}
+            - name: SITE_NAME
+              value: {{ .Values.env.SITE_NAME | quote }}
             - name: CONTROLLER_URL
               value: {{ .Values.env.CONTROLLER_URL | quote }}
+            - name: TENANT_ID
+              value: {{ .Values.env.TENANT_ID | quote }}
             - name: DATABASE_URL
               valueFrom: { secretKeyRef: { name: qdic-assets-secrets, key: DATABASE_URL } }
             - name: RABBITMQ_URL
-              value: {{ .Values.env.RABBITMQ_URL | quote }}
-            - name: OPENSEARCH_URL
-              value: {{ .Values.env.OPENSEARCH_URL | quote }}
+              valueFrom: { secretKeyRef: { name: qdic-assets-secrets, key: RABBITMQ_URL } }
             - name: ADVERTISE_ENDPOINT
-              value: {{ default (printf "http://%s:%d" "qdic-assets" .Values.service.port) .Values.env.ADVERTISE_ENDPOINT | quote }}
+              value: {{ default (printf "http://%s.%s.svc:%d" "qdic-assets" .Release.Namespace .Values.service.port) .Values.env.ADVERTISE_ENDPOINT | quote }}
+            - name: READINESS_PATH
+              value: {{ .Values.env.READINESS_PATH | quote }}
+            - name: EVENT_PROCESSOR_WORKER_POOL_SIZE
+              value: {{ .Values.env.EVENT_PROCESSOR_WORKER_POOL_SIZE | quote }}
+            - name: EVENT_CONSUMER_WORKER_POOL_SIZE
+              value: {{ .Values.env.EVENT_CONSUMER_WORKER_POOL_SIZE | quote }}
+            - name: REPLICATOR_USER
+              value: {{ .Values.env.REPLICATOR_USER | quote }}
+            - name: REPLICATOR_PASSWORD
+              valueFrom: { secretKeyRef: { name: qdic-assets-secrets, key: REPLICATOR_PASSWORD } }
+            - name: PUBLICATION_NAME
+              value: {{ .Values.env.PUBLICATION_NAME | quote }}
+            - name: RABBITMQ_EVENTS_QUEUE
+              value: {{ .Values.env.RABBITMQ_EVENTS_QUEUE | quote }}
           ports: [ { name: http, containerPort: 8080 } ]
-          readinessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 3, periodSeconds: 5 }
+          readinessProbe: { httpGet: { path: {{ .Values.env.READINESS_PATH | default "/healthz" | quote }}, port: http }, initialDelaySeconds: 3, periodSeconds: 5 }
 ---
 apiVersion: v1
 kind: Secret
 metadata: { name: qdic-assets-secrets }
 type: Opaque
 stringData:
+  ENV: {{ .Values.env.ENV | quote }}
+  APP_NAME: {{ .Values.env.APP_NAME | quote }}
+  SITE_NAME: {{ .Values.env.SITE_NAME | quote }}
+  CONTROLLER_URL: {{ .Values.env.CONTROLLER_URL | quote }}
+  TENANT_ID: {{ .Values.env.TENANT_ID | quote }}
   DATABASE_URL: {{ .Values.env.DATABASE_URL | quote }}
+  RABBITMQ_URL: {{ .Values.env.RABBITMQ_URL | quote }}
+  ADVERTISE_ENDPOINT: {{ .Values.env.ADVERTISE_ENDPOINT | quote }}
+  READINESS_PATH: {{ .Values.env.READINESS_PATH | quote }}
+  EVENT_PROCESSOR_WORKER_POOL_SIZE: {{ .Values.env.EVENT_PROCESSOR_WORKER_POOL_SIZE | quote }}
+  EVENT_CONSUMER_WORKER_POOL_SIZE: {{ .Values.env.EVENT_CONSUMER_WORKER_POOL_SIZE | quote }}
+  REPLICATOR_PASSWORD: {{ .Values.env.REPLICATOR_PASSWORD | quote }}
+  REPLICATOR_USER: {{ .Values.env.REPLICATOR_USER | quote }}
+  PUBLICATION_NAME: {{ .Values.env.PUBLICATION_NAME | quote }}
+  RABBITMQ_EVENTS_QUEUE: {{ .Values.env.RABBITMQ_EVENTS_QUEUE | quote }}
+
 ---
 apiVersion: v1
 kind: Service
