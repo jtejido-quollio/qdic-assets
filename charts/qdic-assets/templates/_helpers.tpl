@@ -39,6 +39,6 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | default .Chart.Version | quote
 Selector labels (must match Deployment selector).
 */}}
 {{- define "qdic-assets.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "qdic-controller.name" . }}
+app.kubernetes.io/name: {{ include "qdic-assets.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
