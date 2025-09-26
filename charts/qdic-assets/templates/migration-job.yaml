@@ -28,18 +28,29 @@ spec:
           command: ["python", "-m", "alembic", "upgrade", "head"]
           env:
             - name: DATABASE_URL
-              value: {{ .Values.env.DATABASE_URL | quote }}
-            - name: REPLICATOR_USER
-              value: {{ .Values.env.REPLICATOR_USER | quote }}
+              valueFrom: { secretKeyRef: { name: qdic-assets-migration-secrets, key: DATABASE_URL } }
+            - name: RABBITMQ_URL
+              valueFrom: { secretKeyRef: { name: qdic-assets-migration-secrets, key: RABBITMQ_URL } }
             - name: REPLICATOR_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: qdic-assets-secrets
-                  key: REPLICATOR_PASSWORD
+              valueFrom: { secretKeyRef: { name: qdic-assets-migration-secrets, key: REPLICATOR_PASSWORD } }
             - name: PUBLICATION_NAME
               value: {{ .Values.env.PUBLICATION_NAME | quote }}
             - name: EVENTS_SCHEMA
               value: {{ .Values.env.EVENTS_SCHEMA | default "public" | quote }}
             - name: EVENTS_TABLE
               value: {{ .Values.env.EVENTS_TABLE  | default "events"  | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qdic-assets-migration-secrets
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+type: Opaque
+stringData:
+  DATABASE_URL: {{ .Values.env.DATABASE_URL | quote }}
+  RABBITMQ_URL: {{ .Values.env.RABBITMQ_URL | quote }}
+  REPLICATOR_PASSWORD: {{ .Values.env.REPLICATOR_PASSWORD | quote }}
 {{- end }}

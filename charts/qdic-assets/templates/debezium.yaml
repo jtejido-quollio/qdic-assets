@@ -13,6 +13,10 @@ spec:
           configMap: { name: qdic-assets-debezium-config }
         - name: debezium-data
           emptyDir: {}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 4 }}
+      {{- end }}
       containers:
         - name: debezium-server
           image: {{ .Values.debezium.image | quote }}
