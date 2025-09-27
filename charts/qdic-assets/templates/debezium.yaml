@@ -14,15 +14,28 @@ spec:
       {{- end }}
       volumes:
         - name: app-config
-          configMap: { name: qdic-assets-debezium-config }
+          configMap:
+            name: qdic-assets-debezium-config
+            # ensure the key name matches below
+            items:
+              - key: application.properties
+                path: application.properties
         - name: debezium-data
           emptyDir: {}
       containers:
         - name: debezium-server
           image: {{ .Values.debezium.image | quote }}
+          # tell Quarkus exactly where the file is
+          env:
+            - name: QUARKUS_CONFIG_LOCATIONS
+              value: /debezium/config/application.properties
           volumeMounts:
-            - { name: app-config, mountPath: /debezium/conf }
-            - { name: debezium-data, mountPath: /debezium/data }
+            # mount just the file, not the whole dir
+            - name: app-config
+              mountPath: /debezium/config/application.properties
+              subPath: application.properties
+            - name: debezium-data
+              mountPath: /debezium/data
 ---
 apiVersion: v1
 kind: ConfigMap
