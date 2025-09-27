@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 def _should_register() -> bool:
     # Skip in local by default unless explicitly enabled
-    if (settings.ENV or "").lower() is "local":
+    if (settings.ENV or "").lower() == "local":
         return False
     # Require controller URL + endpoint to be present
     if not settings.CONTROLLER_URL:
