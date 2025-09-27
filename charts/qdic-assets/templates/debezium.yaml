@@ -20,7 +20,6 @@ spec:
       containers:
         - name: debezium-server
           image: {{ .Values.debezium.image | quote }}
-          env: [ { name: QUARKUS_PROFILE, value: "prod" } ]
           volumeMounts:
             - { name: app-config, mountPath: /debezium/conf }
             - { name: debezium-data, mountPath: /debezium/data }
