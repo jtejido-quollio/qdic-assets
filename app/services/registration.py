@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Optional
-from urllib.parse import urlparse
+from sqlalchemy.engine import make_url
 
 import httpx
 from tenacity import (
@@ -38,20 +38,17 @@ def _raise_for_retryable(resp: httpx.Response) -> None:
 
 def _parse_db_url(url: str) -> dict:
     """
-    Accepts sync or async pg URLs:
+    Parses both sync/async PostgreSQL URLs, e.g.:
       postgresql://user:pass@host:5432/db
       postgresql+asyncpg://user:pass@host:5432/db
     """
-    p = urlparse(url)
-    # strip +asyncpg
-    scheme = p.scheme.split("+", 1)[0]
-    if scheme not in ("postgresql", "postgres"):
-        raise ValueError(f"Unsupported DB scheme in DATABASE_URL: {p.scheme}")
-    host = p.hostname or ""
-    port = int(p.port or 5432)
-    db = (p.path or "").lstrip("/") or ""
-    user = p.username or ""
-    return {"db_host": host, "db_port": port, "db_name": db, "db_user": user}
+    u = make_url(url)
+    return {
+        "db_host": u.host or "",
+        "db_port": int(u.port or 5432),
+        "db_name": (u.database or ""),
+        "db_user": (u.username or ""),
+    }
 
 
 @retry(
